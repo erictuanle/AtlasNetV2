@@ -1,11 +1,12 @@
 from __future__  import print_function
+import abc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 from auxiliary.utils import *
-
+import torchvision
 
 #TODO dim -> input dim output dim
 
@@ -353,19 +354,22 @@ class PatchDeformMLPAdj(nn.Module):
         self.nbatch = options.nbatch
         self.patchDim = options.patchDim
         self.patchDeformDim = options.patchDeformDim
+        self.trained_decoder = options.trained_decoder
 
         #encoder decoder and patch deformation module
         #==============================================================================
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
+        self.encoder = None
         self.decoder = nn.ModuleList([mlpAdj(nlatent = self.patchDeformDim + self.nlatent) for i in range(0,self.npatch)])
         self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.npatch))
         #==============================================================================
-
+    @abc.abstractmethod
+    def encode(self, x):
+        pass
     def forward(self, x):
 
         #encoder
         #==============================================================================
-        x = self.encoder(x.transpose(2,1).contiguous())
+        x = self.encode(x)
         #==============================================================================
 
         outs = []
@@ -389,6 +393,27 @@ class PatchDeformMLPAdj(nn.Module):
             #==========================================================================
 
         return torch.cat(outs,2).transpose(2,1).contiguous(), patches
+
+class AE_PatchDeformMLPAdj(PatchDeformMLPAdj):
+    def __init__(self, options):
+        super(AE_PatchDeformMLPAdj, self).__init__(options)
+        self.encoder = PointNetfeat(self.npoint,self.nlatent)
+    def encode(self, x):
+        x = self.encoder(x.transpose(2,1).contiguous())
+        return x
+
+class SVR_PatchDeformMLPAdj(PatchDeformMLPAdj):
+    def __init__(self, options):
+        super(SVR_PatchDeformMLPAdj, self).__init__(options)
+        self.encoder = torchvision.models.resnet18(num_classes=1024)
+        #self.decoder.load_state_dict(torch.load(self.trained_decoder))
+        for parameter in self.decoder.parameters():
+            parameter.requires_grad = False
+
+    def encode(self, x):
+        x = self.encoder(x)
+        return x
+
 
 
 class PatchDeformLinAdj(nn.Module):
@@ -449,7 +474,10 @@ class MODEL_LIST:
     """list of all the model"""
     def __init__(self, options):
         if options.adjust == 'mlp':
-             self.models = {'AtlasNet':AtlasNet,'PointTranslation':PointTransMLPAdj,'PatchDeformation':PatchDeformMLPAdj}
+            if options.use_svr:
+                self.models = {'AtlasNet':AtlasNet,'PointTranslation':PointTransMLPAdj,'PatchDeformation':SVR_PatchDeformMLPAdj}
+            else:
+                self.models = {'AtlasNet':AtlasNet,'PointTranslation':PointTransMLPAdj,'PatchDeformation':AE_PatchDeformMLPAdj}
         elif options.adjust == 'linear':
              self.models = {'AtlasNet':AtlasNetLinAdj,'PointTranslation':PointTransLinAdj,'PatchDeformation':PatchDeformLinAdj}
         else:

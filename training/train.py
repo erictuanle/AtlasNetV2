@@ -32,7 +32,13 @@ parser.add_argument('--loadmodel', type=str, default=None,help='')
 parser.add_argument('--firstdecay', type=int, default = 250,  help='')
 parser.add_argument('--seconddecay', type=int, default = 300,  help='')
 parser.add_argument('--training_id', type=str, default=None,help='')
+parser.add_argument('--use_svr', type=lambda x: str(x).lower()=='true', default=False,help='')
+parser.add_argument('--trained_decoder', type=str, help='')
+parser.add_argument('--workers', type=int, default=0, help='')
 opt = parser.parse_args()
+
+#if opt.use_svr:
+#    assert(opt.trained_decoder)
 
 if opt.training_id == None and opt.model in ['PointTranslation','AtlasNet']:
 
@@ -97,13 +103,13 @@ dataset_train = DATASET.load(training=True,options=opt)
 dataloader_train = torch.utils.data.DataLoader(dataset_train,
                                                shuffle=True,
                                                batch_size=opt.nbatch,
-                                               num_workers=12)
+                                               num_workers=opt.workers)
 
 dataset_valid = DATASET.load(training=False,options=opt)
 dataloader_valid = torch.utils.data.DataLoader(dataset_valid,
                                                shuffle=False,
                                                batch_size=opt.nbatch,
-                                               num_workers=12)
+                                               num_workers=opt.workers)
 #======================================================================================
 
 
@@ -162,13 +168,18 @@ for epoch_id in range(opt.nepoch):
     #==================================================================================
     for batch_id, batch in enumerate(dataloader_train):
 
-        if batch.size(0) == opt.nbatch:
+        if batch[0].size(0) == opt.nbatch:
 
             optimizer.zero_grad()
 
-            batch = batch.cuda()
-            prediction, learnedPatches = network(batch.cuda())
-            fittingLoss = loss(batch,prediction)
+            data, point_set = batch
+            data = data.cuda()
+            point_set = point_set.cuda()
+            if opt.use_svr:
+                prediction, learnedPatches = network(data.cuda())
+            else:
+                prediction, learnedPatches = network(point_set.cuda())
+            fittingLoss = loss(point_set,prediction)
 
             fittingLoss.backward()
             optimizer.step()

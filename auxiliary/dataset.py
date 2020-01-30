@@ -7,17 +7,18 @@ import numpy as np
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from auxiliary.utils import *
+from PIL import Image
 
 class ShapeNet(data.Dataset):
     def __init__(self,train=True,options=None):
-        rootimg = "./data/ShapeNet/ShapeNetRendering"
-        rootpc = "./data/customShapeNet"
-        class_choice = None
+        rootimg = "/mnt/Data/AtlasNet_v2/ShapeNet/ShapeNetRendering"
+        rootpc = "/mnt/Data/AtlasNet_v2/customShapeNet"
+        class_choice = 'car'
         npoints = options.npoint
         normal = False
         balanced = False
         gen_view=False
-        SVR=False
+        SVR=options.use_svr
         idx=0
         self.balanced = balanced
         self.normal = normal
@@ -38,6 +39,7 @@ class ShapeNet(data.Dataset):
                 self.cat[ls[0]] = ls[1]
         if not class_choice is  None:
             self.cat = {k:v for k,v in self.cat.items() if k in class_choice}
+        
         print(self.cat)
         empty = []
         for item in self.cat:
@@ -82,18 +84,18 @@ class ShapeNet(data.Dataset):
                                      std=[0.229, 0.224, 0.225])
 
         self.transforms = transforms.Compose([
-                             transforms.Resize(size =  224, interpolation = 2),
+                             #transforms.Resize(size =  224, interpolation = 2),
                              transforms.ToTensor(),
                              # normalize,
                         ])
 
         # RandomResizedCrop or RandomCrop
         self.dataAugmentation = transforms.Compose([
-                                         transforms.RandomCrop(127),
-                                         transforms.RandomHorizontalFlip(),
+                                         #transforms.RandomCrop(127),
+                                         #transforms.RandomHorizontalFlip(),
                             ])
         self.validating = transforms.Compose([
-                        transforms.CenterCrop(127),
+                        #transforms.CenterCrop(127),
                         ])
 
         self.perCatValueMeter = {}
@@ -103,7 +105,7 @@ class ShapeNet(data.Dataset):
         for item in self.cat:
             self.perCatValueMeter_metro[item] = AverageValueMeter()
         self.transformsb = transforms.Compose([
-                             transforms.Resize(size =  224, interpolation = 2),
+                             #transforms.Resize(size =  224, interpolation = 2),
                         ])
 
     def __getitem__(self, index):
@@ -160,7 +162,8 @@ class ShapeNet(data.Dataset):
             data = data[:3,:,:]
         else:
             data = 0
-        return  point_set.contiguous()
+
+        return data, point_set.contiguous()
 
 
     def __len__(self):
