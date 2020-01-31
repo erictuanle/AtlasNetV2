@@ -11,9 +11,6 @@ from PIL import Image
 
 class ShapeNet(data.Dataset):
     def __init__(self,train=True,options=None):
-        rootimg = "/mnt/Data/AtlasNet_v2/ShapeNet/ShapeNetRendering"
-        rootpc = "/mnt/Data/AtlasNet_v2/customShapeNet"
-        class_choice = 'car'
         npoints = options.npoint
         normal = False
         balanced = False
@@ -23,8 +20,8 @@ class ShapeNet(data.Dataset):
         self.balanced = balanced
         self.normal = normal
         self.train = train
-        self.rootimg = rootimg
-        self.rootpc = rootpc
+        self.rootimg = options.rootimg
+        self.rootpc = options.rootpc
         self.npoints = npoints
         self.datapath = []
         self.catfile = os.path.join('./data/synsetoffset2category.txt')
@@ -37,8 +34,8 @@ class ShapeNet(data.Dataset):
             for line in f:
                 ls = line.strip().split()
                 self.cat[ls[0]] = ls[1]
-        if not class_choice is  None:
-            self.cat = {k:v for k,v in self.cat.items() if k in class_choice}
+        if not options.class_choice is  None:
+            self.cat = {k:v for k,v in self.cat.items() if k in options.class_choice}
         
         print(self.cat)
         empty = []
@@ -62,8 +59,8 @@ class ShapeNet(data.Dataset):
             if len(fns) != 0:
                 self.meta[item] = []
                 for fn in fns:
-                    objpath = "./data/ShapeNetCorev2/" +  self.cat[item] + "/" + fn + "/models/model_normalized.ply"
-                    self.meta[item].append( ( os.path.join(dir_img, fn, "rendering"), os.path.join(dir_point, fn + '.points.ply'), item, objpath, fn ) )
+                    objpath = "ShapeNetCorev2/" +  self.cat[item] + "/" + fn + "/models/model_normalized.ply"
+                    self.meta[item].append( ( os.path.join(dir_img, fn), os.path.join(dir_point, fn + '.points.ply'), item, objpath, fn ) )
             else:
                 empty.append(item)
         for item in empty:
@@ -146,17 +143,11 @@ class ShapeNet(data.Dataset):
                     N=0
                 else:
                     N = np.random.randint(1,N_tot)
-                if N < 10:
-                    im = Image.open(os.path.join(fn[0], "0" + str(N) + ".png"))
-                else:
-                    im = Image.open(os.path.join(fn[0],  str(N) + ".png"))
+                im = Image.open(os.path.join(fn[0], str(N) + ".png"))
 
                 im = self.dataAugmentation(im) #random crop
             else:
-                if self.idx < 10:
-                    im = Image.open(os.path.join(fn[0], "0" + str(self.idx) + ".png"))
-                else:
-                    im = Image.open(os.path.join(fn[0],  str(self.idx) + ".png"))
+                im = Image.open(os.path.join(fn[0],  str(self.idx) + ".png"))
                 im = self.validating(im) #center crop
             data = self.transforms(im) #scale
             data = data[:3,:,:]

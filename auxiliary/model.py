@@ -355,49 +355,67 @@ class PatchDeformMLPAdj(nn.Module):
         self.patchDim = options.patchDim
         self.patchDeformDim = options.patchDeformDim
         self.trained_decoder = options.trained_decoder
+        self.trained_patchdeformation = options.trained_patchdeformation
 
         #encoder decoder and patch deformation module
         #==============================================================================
         self.encoder = None
         self.decoder = nn.ModuleList([mlpAdj(nlatent = self.patchDeformDim + self.nlatent) for i in range(0,self.npatch)])
+        if self.trained_decoder:
+            if not os.path.isfile(self.trained_decoder):
+                raise Exception('Not a valid path for AtlasNet decoder %s'%self.trained_decoder)
+            self.decoder.load_state_dict(torch.load(self.trained_decoder))
+
         self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.npatch))
+        if self.trained_patchdeformation:
+            if not os.path.isfile(self.trained_patchdeformation):
+                raise Exception('Not a valid path for AtlasNet patchdeformation %s'%self.trained_patchdeformation)
+            self.patchDeformation.load_state_dict(torch.load(self.trained_patchdeformation))
+
         #==============================================================================
     @abc.abstractmethod
     def encode(self, x):
         pass
+    def forward_inference_from_latent_space(self, x, input_grid):
+        batch_size, _ = x.size()
+        # To keep the same interface as before
+        if len(input_grid.size()) < 4:
+            input_grid = input_grid.unsqueeze(0).repeat(batch_size, 1, 1, 1)
+        #  To keep the same interface  as before
+        outs = []
+        patches = []
+        for i in range(0,self.npatch):
+            grid = self.patchDeformation[i](input_grid[:,i,:,:].contiguous())
+            patches.append(grid[0].transpose(1,0))
+            #==========================================================================
+            #cat with latent vector and decode
+            #==========================================================================
+            y = x.unsqueeze(2).expand(x.size(0),x.size(1), grid.size(2)).contiguous()
+            y = torch.cat( (grid, y), 1).contiguous()
+            outs.append(self.decoder[i](y))
+            #==========================================================================
+        return torch.cat(outs,2).transpose(2,1).contiguous(), patches
     def forward(self, x):
-
         #encoder
         #==============================================================================
         x = self.encode(x)
         #==============================================================================
-
-        outs = []
-        patches = []
-        for i in range(0,self.npatch):
-
-            #random planar patch
-            #==========================================================================
-            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.npatch).cuda()
-            rand_grid.data.uniform_(0,1)
-            rand_grid[:,2:,:] = 0
-            rand_grid = self.patchDeformation[i](rand_grid.contiguous())
-            patches.append(rand_grid[0].transpose(1,0))
-            #==========================================================================
-
-            #cat with latent vector and decode
-            #==========================================================================
-            y = x.unsqueeze(2).expand(x.size(0),x.size(1), rand_grid.size(2)).contiguous()
-            y = torch.cat( (rand_grid, y), 1).contiguous()
-            outs.append(self.decoder[i](y))
-            #==========================================================================
-
-        return torch.cat(outs,2).transpose(2,1).contiguous(), patches
+        #random planar patch
+        #==========================================================================
+        rand_grid = torch.FloatTensor(x.size(0),self.npatch,self.patchDim,self.npoint//self.npatch).cuda()
+        rand_grid.data.uniform_(0,1)
+        rand_grid[:,:,2:,:] = 0
+        return self.forward_inference_from_latent_space(x, rand_grid)
 
 class AE_PatchDeformMLPAdj(PatchDeformMLPAdj):
     def __init__(self, options):
         super(AE_PatchDeformMLPAdj, self).__init__(options)
         self.encoder = PointNetfeat(self.npoint,self.nlatent)
+        self.trained_encoder = options.trained_encoder
+        if self.trained_encoder:
+            if not os.path.isfile(self.trained_encoder):
+                raise Exception('Not a valid path for AtlasNet encoder %s'%self.trained_encoder)
+            self.encoder.load_state_dict(torch.load(self.trained_encoder))
     def encode(self, x):
         x = self.encoder(x.transpose(2,1).contiguous())
         return x
@@ -406,15 +424,17 @@ class SVR_PatchDeformMLPAdj(PatchDeformMLPAdj):
     def __init__(self, options):
         super(SVR_PatchDeformMLPAdj, self).__init__(options)
         self.encoder = torchvision.models.resnet18(num_classes=1024)
-        #self.decoder.load_state_dict(torch.load(self.trained_decoder))
+        self.trained_encoder = options.trained_encoder
+        if self.trained_encoder:
+            if not os.path.isfile(self.trained_encoder):
+                raise Exception('Not a valid path for AtlasNet encoder %s'%self.trained_encoder)
+            self.encoder.load_state_dict(torch.load(self.trained_encoder))
         for parameter in self.decoder.parameters():
-            parameter.requires_grad = False
+            parameter.requires_grad = options.train_decoder
 
     def encode(self, x):
         x = self.encoder(x)
         return x
-
-
 
 class PatchDeformLinAdj(nn.Module):
     """Ours auto encoder"""
@@ -489,5 +509,4 @@ class MODEL_LIST:
         self.type = self.models.keys()
 
     def load(self,options):
-
         return self.models[options.model](options).cuda()

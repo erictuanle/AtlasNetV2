@@ -24,7 +24,8 @@ def display_opts(opts):
             model         %s %s %s
             adjust        %s %s %s
             dataset       %s %s %s
-            loadmodel     %s %s %s
+            trained_encoder     %s %s %s
+            trained_decoder     %s %s %s
             npatch        %s %s %s
             npoint        %s %s %s
             nlatent       %s %s %s
@@ -37,7 +38,8 @@ def display_opts(opts):
             """%(COLORS.OKGREEN,opts.model,COLORS.ENDC,
                  COLORS.OKGREEN,opts.adjust,COLORS.ENDC,
                  COLORS.OKGREEN,opts.dataset,COLORS.ENDC,
-                 COLORS.OKGREEN,opts.loadmodel,COLORS.ENDC,
+                 COLORS.OKGREEN,opts.trained_encoder,COLORS.ENDC,
+                 COLORS.OKGREEN,opts.trained_decoder,COLORS.ENDC,
                  COLORS.OKGREEN,opts.npatch,COLORS.ENDC,
                  COLORS.OKGREEN,opts.npoint,COLORS.ENDC,
                  COLORS.OKGREEN,opts.nlatent,COLORS.ENDC,
