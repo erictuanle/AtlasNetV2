@@ -5,22 +5,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
-from auxiliary.utils import *
+from utils import *
 import torchvision
+import os
 
 #TODO dim -> input dim output dim
 
 class linearTransformMLP(nn.Module):
     """linear transformation module"""
 
-    def __init__(self, nlatent = 1024):
+    def __init__(self, atlasnet_nlatent = 1024):
         super(linearTransformMLP, self).__init__()
 
-        self.conv1 = torch.nn.Conv1d(nlatent, nlatent//2, 1)
-        self.conv2 = torch.nn.Conv1d(nlatent//2, nlatent//2, 1)
-        self.conv3 = torch.nn.Conv1d(nlatent//2, 16, 1)
-        self.bn1 = torch.nn.BatchNorm1d(nlatent//2)
-        self.bn2 = torch.nn.BatchNorm1d(nlatent//2)
+        self.conv1 = torch.nn.Conv1d(atlasnet_nlatent, atlasnet_nlatent//2, 1)
+        self.conv2 = torch.nn.Conv1d(atlasnet_nlatent//2, atlasnet_nlatent//2, 1)
+        self.conv3 = torch.nn.Conv1d(atlasnet_nlatent//2, 16, 1)
+        self.bn1 = torch.nn.BatchNorm1d(atlasnet_nlatent//2)
+        self.bn2 = torch.nn.BatchNorm1d(atlasnet_nlatent//2)
         self.th = nn.Tanh()
 
     def forward(self, x):
@@ -34,14 +35,14 @@ class linearTransformMLP(nn.Module):
 class linearAdj(nn.Module):
     """ prediction the linear transdormation matrix"""
 
-    def __init__(self, dim = 3,nlatent = 1024):
+    def __init__(self, dim = 3,atlasnet_nlatent = 1024):
         super(linearAdj, self).__init__()
 
-        self.conv1 = torch.nn.Conv1d(nlatent, nlatent//2, 1)
-        self.conv2 = torch.nn.Conv1d(nlatent//2, nlatent//2, 1)
-        self.conv3 = torch.nn.Conv1d(nlatent//2, (dim+1)*3, 1)
-        self.bn1 = torch.nn.BatchNorm1d(nlatent//2)
-        self.bn2 = torch.nn.BatchNorm1d(nlatent//2)
+        self.conv1 = torch.nn.Conv1d(atlasnet_nlatent, atlasnet_nlatent//2, 1)
+        self.conv2 = torch.nn.Conv1d(atlasnet_nlatent//2, atlasnet_nlatent//2, 1)
+        self.conv3 = torch.nn.Conv1d(atlasnet_nlatent//2, (dim+1)*3, 1)
+        self.bn1 = torch.nn.BatchNorm1d(atlasnet_nlatent//2)
+        self.bn2 = torch.nn.BatchNorm1d(atlasnet_nlatent//2)
         self.th = nn.Tanh()
         self.dim = dim
 
@@ -55,20 +56,20 @@ class linearAdj(nn.Module):
         return R,T
 
 class mlpAdj(nn.Module):
-    def __init__(self, nlatent = 1024):
+    def __init__(self, atlasnet_nlatent = 1024):
         """Atlas decoder"""
 
         super(mlpAdj, self).__init__()
-        self.nlatent = nlatent
-        self.conv1 = torch.nn.Conv1d(self.nlatent, self.nlatent, 1)
-        self.conv2 = torch.nn.Conv1d(self.nlatent, self.nlatent//2, 1)
-        self.conv3 = torch.nn.Conv1d(self.nlatent//2, self.nlatent//4, 1)
-        self.conv4 = torch.nn.Conv1d(self.nlatent//4, 3, 1)
+        self.atlasnet_nlatent = atlasnet_nlatent
+        self.conv1 = torch.nn.Conv1d(self.atlasnet_nlatent, self.atlasnet_nlatent, 1)
+        self.conv2 = torch.nn.Conv1d(self.atlasnet_nlatent, self.atlasnet_nlatent//2, 1)
+        self.conv3 = torch.nn.Conv1d(self.atlasnet_nlatent//2, self.atlasnet_nlatent//4, 1)
+        self.conv4 = torch.nn.Conv1d(self.atlasnet_nlatent//4, 3, 1)
 
         self.th = nn.Tanh()
-        self.bn1 = torch.nn.BatchNorm1d(self.nlatent)
-        self.bn2 = torch.nn.BatchNorm1d(self.nlatent//2)
-        self.bn3 = torch.nn.BatchNorm1d(self.nlatent//4)
+        self.bn1 = torch.nn.BatchNorm1d(self.atlasnet_nlatent)
+        self.bn2 = torch.nn.BatchNorm1d(self.atlasnet_nlatent//2)
+        self.bn3 = torch.nn.BatchNorm1d(self.atlasnet_nlatent//4)
 
     def forward(self, x):
         batchsize = x.size()[0]
@@ -103,22 +104,22 @@ class patchDeformationMLP(nn.Module):
         return x
 
 class PointNetfeat(nn.Module):
-    def __init__(self, npoint = 2500, nlatent = 1024):
+    def __init__(self, npoint = 2500, atlasnet_nlatent = 1024):
         """Encoder"""
 
         super(PointNetfeat, self).__init__()
         self.conv1 = torch.nn.Conv1d(3, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
-        self.conv3 = torch.nn.Conv1d(128, nlatent, 1)
-        self.lin = nn.Linear(nlatent, nlatent)
+        self.conv3 = torch.nn.Conv1d(128, atlasnet_nlatent, 1)
+        self.lin = nn.Linear(atlasnet_nlatent, atlasnet_nlatent)
 
         self.bn1 = torch.nn.BatchNorm1d(64)
         self.bn2 = torch.nn.BatchNorm1d(128)
-        self.bn3 = torch.nn.BatchNorm1d(nlatent)
-        self.bn4 = torch.nn.BatchNorm1d(nlatent)
+        self.bn3 = torch.nn.BatchNorm1d(atlasnet_nlatent)
+        self.bn4 = torch.nn.BatchNorm1d(atlasnet_nlatent)
 
         self.npoint = npoint
-        self.nlatent = nlatent
+        self.atlasnet_nlatent = atlasnet_nlatent
 
     def forward(self, x):
         batchsize = x.size()[0]
@@ -126,7 +127,7 @@ class PointNetfeat(nn.Module):
         x = F.relu(self.bn2(self.conv2(x)))
         x = self.bn3(self.conv3(x))
         x,_ = torch.max(x, 2)
-        x = x.view(-1, self.nlatent)
+        x = x.view(-1, self.atlasnet_nlatent)
         x = F.relu(self.bn4(self.lin(x).unsqueeze(-1)))
         return x[...,0]
 
@@ -138,14 +139,14 @@ class AtlasNet(nn.Module):
         super(AtlasNet, self).__init__()
 
         self.npoint = options.npoint
-        self.npatch = options.npatch
-        self.nlatent = options.nlatent
+        self.nb_patches = options.nb_patches
+        self.atlasnet_nlatent = options.atlasnet_nlatent
         self.patchDim = options.patchDim
 
         #encoder and decoder modules
         #==============================================================================
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
-        self.decoder = nn.ModuleList([mlpAdj(nlatent = 2 +self.nlatent) for i in range(0,self.npatch)])
+        self.encoder = PointNetfeat(self.npoint,self.atlasnet_nlatent)
+        self.decoder = nn.ModuleList([mlpAdj(atlasnet_nlatent = 2 +self.atlasnet_nlatent) for i in range(0,self.nb_patches)])
         #==============================================================================
 
     def forward(self, x):
@@ -157,11 +158,11 @@ class AtlasNet(nn.Module):
 
         outs = []
         patches = []
-        for i in range(0,self.npatch):
+        for i in range(0,self.nb_patches):
 
             #random patch
             #==========================================================================
-            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.npatch).cuda()
+            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.nb_patches).cuda()
             rand_grid.data.uniform_(0,1)
             rand_grid[:,2:,:] = 0
             patches.append(rand_grid[0].transpose(1,0))
@@ -185,14 +186,14 @@ class AtlasNetLinAdj(nn.Module):
         super(AtlasNetLinAdj, self).__init__()
 
         self.npoint = options.npoint
-        self.npatch = options.npatch
-        self.nlatent = options.nlatent
+        self.nb_patches = options.nb_patches
+        self.atlasnet_nlatent = options.atlasnet_nlatent
         self.patchDim = options.patchDim
 
         #encoder and decoder modules
         #==============================================================================
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
-        self.linearTransformMatrix = nn.ModuleList(linearAdj(dim=self.patchDim,nlatent=self.nlatent) for i in range(0,self.npatch))
+        self.encoder = PointNetfeat(self.npoint,self.atlasnet_nlatent)
+        self.linearTransformMatrix = nn.ModuleList(linearAdj(dim=self.patchDim,atlasnet_nlatent=self.atlasnet_nlatent) for i in range(0,self.nb_patches))
         #==============================================================================
 
     def forward(self, x):
@@ -204,11 +205,11 @@ class AtlasNetLinAdj(nn.Module):
 
         outs = []
         patches = []
-        for i in range(0,self.npatch):
+        for i in range(0,self.nb_patches):
 
             #random patch
             #==========================================================================
-            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.npatch).cuda()
+            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.nb_patches).cuda()
             rand_grid.data.uniform_(0,1)
             rand_grid[:,2:,:] = 0
             patches.append(rand_grid[0].transpose(1,0))
@@ -232,22 +233,22 @@ class PointTransMLPAdj(nn.Module):
         super(PointTransMLPAdj, self).__init__()
 
         self.npoint = options.npoint
-        self.npatch = options.npatch
-        self.nlatent = options.nlatent
+        self.nb_patches = options.nb_patches
+        self.atlasnet_nlatent = options.atlasnet_nlatent
         self.nbatch = options.nbatch
         self.dim = options.patchDim
 
         #encoder and decoder modules
         #==============================================================================
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
-        self.decoder = nn.ModuleList([mlpAdj(nlatent = self.dim + self.nlatent) for i in range(0,self.npatch)])
+        self.encoder = PointNetfeat(self.npoint,self.atlasnet_nlatent)
+        self.decoder = nn.ModuleList([mlpAdj(atlasnet_nlatent = self.dim + self.atlasnet_nlatent) for i in range(0,self.nb_patches)])
         #==============================================================================
 
         #patch
         #==============================================================================
         self.grid = []
-        for patchIndex in range(self.npatch):
-            patch = torch.nn.Parameter(torch.FloatTensor(1,self.dim,self.npoint//self.npatch))
+        for patchIndex in range(self.nb_patches):
+            patch = torch.nn.Parameter(torch.FloatTensor(1,self.dim,self.npoint//self.nb_patches))
             patch.data.uniform_(0,1)
             patch.data[:,2:,:]=0
             self.register_parameter("patch%d"%patchIndex,patch)
@@ -264,7 +265,7 @@ class PointTransMLPAdj(nn.Module):
         outs = []
         patches = []
 
-        for i in range(0,self.npatch):
+        for i in range(0,self.nb_patches):
 
             #random planar patch
             #==========================================================================
@@ -290,24 +291,24 @@ class PointTransLinAdj(nn.Module):
         super(PointTransLinAdj, self).__init__()
 
         self.npoint = options.npoint
-        self.npatch = options.npatch
-        self.nlatent = options.nlatent
+        self.nb_patches = options.nb_patches
+        self.atlasnet_nlatent = options.atlasnet_nlatent
         self.patchDim = options.patchDim
         self.patchDeformDim = options.patchDeformDim
         self.nbatch = options.nbatch
 
         #encoder decoder and patch deformation module
         #==============================================================================
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
-        self.linearTransformMatrix = nn.ModuleList(linearAdj(dim=self.patchDim,nlatent=self.nlatent) for i in range(0,self.npatch))
-        self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.npatch))
+        self.encoder = PointNetfeat(self.npoint,self.atlasnet_nlatent)
+        self.linearTransformMatrix = nn.ModuleList(linearAdj(dim=self.patchDim,atlasnet_nlatent=self.atlasnet_nlatent) for i in range(0,self.nb_patches))
+        self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.nb_patches))
         #==============================================================================
 
         #patch
         #==============================================================================
         self.grid = []
-        for patchIndex in range(self.npatch):
-            patch = torch.nn.Parameter(torch.FloatTensor(1,self.patchDim,self.npoint//self.npatch))
+        for patchIndex in range(self.nb_patches):
+            patch = torch.nn.Parameter(torch.FloatTensor(1,self.patchDim,self.npoint//self.nb_patches))
             patch.data.uniform_(0,1)
             patch.data[:,2:,:]=0
             self.register_parameter("patch%d"%patchIndex,patch)
@@ -323,7 +324,7 @@ class PointTransLinAdj(nn.Module):
 
         outs = []
         patches = []
-        for i in range(0,self.npatch):
+        for i in range(0,self.nb_patches):
 
             #random planar patch
             #==========================================================================
@@ -348,29 +349,28 @@ class PatchDeformMLPAdj(nn.Module):
 
         super(PatchDeformMLPAdj, self).__init__()
 
-        self.npoint = options.npoint
-        self.npatch = options.npatch
-        self.nlatent = options.nlatent
-        self.nbatch = options.nbatch
-        self.patchDim = options.patchDim
-        self.patchDeformDim = options.patchDeformDim
-        self.trained_decoder = options.trained_decoder
-        self.trained_patchdeformation = options.trained_patchdeformation
+        self.nb_patches = options.nb_patches
+        self.atlasnet_nlatent = options.atlasnet_nlatent
+        # self.nbatch = options.nbatch
+        self.patchDim = 2
+        self.patchDeformDim = 3
+        self.trained_atlasnet_decoder = options.trained_atlasnet_decoder
+        self.trained_atlasnet_patch_deformation = options.trained_atlasnet_patch_deformation
 
         #encoder decoder and patch deformation module
         #==============================================================================
         self.encoder = None
-        self.decoder = nn.ModuleList([mlpAdj(nlatent = self.patchDeformDim + self.nlatent) for i in range(0,self.npatch)])
-        if self.trained_decoder:
-            if not os.path.isfile(self.trained_decoder):
-                raise Exception('Not a valid path for AtlasNet decoder %s'%self.trained_decoder)
-            self.decoder.load_state_dict(torch.load(self.trained_decoder))
+        self.decoder = nn.ModuleList([mlpAdj(atlasnet_nlatent = self.patchDeformDim + self.atlasnet_nlatent) for i in range(0,self.nb_patches)])
+        if self.trained_atlasnet_decoder:
+            if not os.path.isfile(self.trained_atlasnet_decoder):
+                raise Exception('Not a valid path for AtlasNet decoder %s'%self.trained_atlasnet_decoder)
+            self.decoder.load_state_dict(torch.load(self.trained_atlasnet_decoder))
 
-        self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.npatch))
-        if self.trained_patchdeformation:
-            if not os.path.isfile(self.trained_patchdeformation):
-                raise Exception('Not a valid path for AtlasNet patchdeformation %s'%self.trained_patchdeformation)
-            self.patchDeformation.load_state_dict(torch.load(self.trained_patchdeformation))
+        self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.nb_patches))
+        if self.trained_atlasnet_patch_deformation:
+            if not os.path.isfile(self.trained_atlasnet_patch_deformation):
+                raise Exception('Not a valid path for AtlasNet patchdeformation %s'%self.trained_atlasnet_patch_deformation)
+            self.patchDeformation.load_state_dict(torch.load(self.trained_atlasnet_patch_deformation))
 
         #==============================================================================
     @abc.abstractmethod
@@ -384,7 +384,7 @@ class PatchDeformMLPAdj(nn.Module):
         #  To keep the same interface  as before
         outs = []
         patches = []
-        for i in range(0,self.npatch):
+        for i in range(0,self.nb_patches):
             grid = self.patchDeformation[i](input_grid[:,i,:,:].contiguous())
             patches.append(grid[0].transpose(1,0))
             #==========================================================================
@@ -402,7 +402,7 @@ class PatchDeformMLPAdj(nn.Module):
         #==============================================================================
         #random planar patch
         #==========================================================================
-        rand_grid = torch.FloatTensor(x.size(0),self.npatch,self.patchDim,self.npoint//self.npatch).cuda()
+        rand_grid = torch.FloatTensor(x.size(0),self.nb_patches,self.patchDim,self.npoint//self.nb_patches).cuda()
         rand_grid.data.uniform_(0,1)
         rand_grid[:,:,2:,:] = 0
         return self.forward_inference_from_latent_space(x, rand_grid)
@@ -410,12 +410,13 @@ class PatchDeformMLPAdj(nn.Module):
 class AE_PatchDeformMLPAdj(PatchDeformMLPAdj):
     def __init__(self, options):
         super(AE_PatchDeformMLPAdj, self).__init__(options)
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
-        self.trained_encoder = options.trained_encoder
-        if self.trained_encoder:
-            if not os.path.isfile(self.trained_encoder):
-                raise Exception('Not a valid path for AtlasNet encoder %s'%self.trained_encoder)
-            self.encoder.load_state_dict(torch.load(self.trained_encoder))
+        self.npoint = options.npoint
+        self.encoder = PointNetfeat(self.npoint,self.atlasnet_nlatent)
+        self.trained_atlasnet_encoder = options.trained_atlasnet_encoder
+        if self.trained_atlasnet_encoder:
+            if not os.path.isfile(self.trained_atlasnet_encoder):
+                raise Exception('Not a valid path for AtlasNet encoder %s'%self.trained_atlasnet_encoder)
+            self.encoder.load_state_dict(torch.load(self.trained_atlasnet_encoder))
     def encode(self, x):
         x = self.encoder(x.transpose(2,1).contiguous())
         return x
@@ -424,13 +425,13 @@ class SVR_PatchDeformMLPAdj(PatchDeformMLPAdj):
     def __init__(self, options):
         super(SVR_PatchDeformMLPAdj, self).__init__(options)
         self.encoder = torchvision.models.resnet18(num_classes=1024)
-        self.trained_encoder = options.trained_encoder
-        if self.trained_encoder:
-            if not os.path.isfile(self.trained_encoder):
-                raise Exception('Not a valid path for AtlasNet encoder %s'%self.trained_encoder)
-            self.encoder.load_state_dict(torch.load(self.trained_encoder))
+        self.trained_atlasnet_encoder = options.trained_atlasnet_encoder
+        if self.trained_atlasnet_encoder:
+            if not os.path.isfile(self.trained_atlasnet_encoder):
+                raise Exception('Not a valid path for AtlasNet encoder %s'%self.trained_atlasnet_encoder)
+            self.encoder.load_state_dict(torch.load(self.trained_atlasnet_encoder))
         for parameter in self.decoder.parameters():
-            parameter.requires_grad = options.train_decoder
+            parameter.requires_grad = options.train_atlasnet_decoder
 
     def encode(self, x):
         x = self.encoder(x)
@@ -444,16 +445,16 @@ class PatchDeformLinAdj(nn.Module):
         super(PatchDeformLinAdj, self).__init__()
 
         self.npoint = options.npoint
-        self.npatch = options.npatch
-        self.nlatent = options.nlatent
+        self.nb_patches = options.nb_patches
+        self.atlasnet_nlatent = options.atlasnet_nlatent
         self.patchDim = options.patchDim
         self.patchDeformDim = options.patchDeformDim
 
         #encoder decoder and patch deformation module
         #==============================================================================
-        self.encoder = PointNetfeat(self.npoint,self.nlatent)
-        self.linearTransformMatrix = nn.ModuleList(linearAdj(dim = self.patchDeformDim,nlatent=self.nlatent) for i in range(0,self.npatch))
-        self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.npatch))
+        self.encoder = PointNetfeat(self.npoint,self.atlasnet_nlatent)
+        self.linearTransformMatrix = nn.ModuleList(linearAdj(dim = self.patchDeformDim,atlasnet_nlatent=self.atlasnet_nlatent) for i in range(0,self.nb_patches))
+        self.patchDeformation = nn.ModuleList(patchDeformationMLP(patchDim = self.patchDim, patchDeformDim = self.patchDeformDim) for i in range(0,self.nb_patches))
         #==============================================================================
 
     def forward(self, x):
@@ -466,11 +467,11 @@ class PatchDeformLinAdj(nn.Module):
         outs = []
         patches = []
 
-        for i in range(0,self.npatch):
+        for i in range(0,self.nb_patches):
 
             #random planar patch
             #==========================================================================
-            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.npatch).cuda()
+            rand_grid = torch.FloatTensor(x.size(0),self.patchDim,self.npoint//self.nb_patches).cuda()
             rand_grid.data.uniform_(0,1)
             rand_grid[:,2:,:] = 0
             #==========================================================================
